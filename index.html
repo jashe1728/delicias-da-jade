@@ -1114,7 +1114,7 @@ footer {
 
     <div class="cta-wrap">
       <button class="cta" id="cta" type="button" onclick="GO()">Enviar encomenda</button>
-      <p class="cta-note">O pedido abre no WhatsApp com todos os detalhes — confirmamos em até 24h.</p>
+      <p class="cta-note">O pedido é enviado diretamente para a Jade — confirmamos em até 24h.</p>
       <p class="cta-note" style="margin-top:.3rem"><a href="#" onclick="event.preventDefault();EM()" style="color:var(--rose);text-decoration:underline">Prefere enviar por email?</a></p>
     </div>
   </div>
@@ -1692,11 +1692,26 @@ function gwToWhatsApp() {
 function GO() {
   if(!V()) return;
   const btn=$('cta');
-  if(btn){ btn.disabled=true; btn.textContent='A abrir WhatsApp… ♥'; }
+  if(btn){ btn.disabled=true; btn.textContent='A enviar encomenda… ♥'; }
   const order = buildOrderText();
-  sendViaWhatsApp(order.text).then(() => {
+  const API = 'https://script.google.com/macros/s/AKfycbx0epH6ZKRTST1ty_UeylcEtirt6XTBeldIUWT95M8aO6tf1rURbZFowjSMAjdHitX3zg/exec';
+  // 1) send directly to the backend → auto-email to Jade + log to Encomendas sheet
+  fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ type: 'order', name: order.n, order: order.text })
+  }).then(r => r.json()).then(d => {
+    const mm=$('mm');
+    if (mm) mm.textContent = d && d.emailed
+      ? `Obrigada ${order.n}! A sua encomenda foi enviada diretamente para a Jade e será confirmada por email ou WhatsApp em até 24h ♥`
+      : `Obrigada ${order.n}! A sua encomenda foi registada — confirmamos em até 24h ♥`;
+    $('ov')?.classList.add('show');
+    if(btn){ btn.disabled=false; btn.textContent='Enviar encomenda'; }
+  }).catch(() => {
+    // backend unreachable → fall back to opening WhatsApp (old behaviour)
     const mm=$('mm');
     if(mm) mm.textContent=`Obrigada ${order.n}! O WhatsApp abriu com a sua encomenda — carregue em enviar para a Jade receber. Se tiver uma foto de referência, anexe-a na conversa. Confirmamos em até 24h ♥`;
+    sendViaWhatsApp(order.text);
     $('ov')?.classList.add('show');
     if(btn){ btn.disabled=false; btn.textContent='Enviar encomenda'; }
   });
