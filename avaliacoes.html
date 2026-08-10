@@ -1081,8 +1081,9 @@ footer {
 
 <script>
 (function(){
-  // ── REVIEWS — aparecem diretamente no site (novas no topo) ──
+  // ── REVIEWS — backend (Google Apps Script) + fallback ──
   function $id(i){ return document.getElementById(i); }
+  const API_URL = 'REPLACE_WITH_WEBAPP_URL';   // ← cola aqui o URL /exec do Apps Script
   const LS_KEY = 'dj_reviews';
 
   function getStored() {
@@ -1095,6 +1096,7 @@ footer {
 
   function fmtDate(d) {
     const now = new Date(d);
+    if (isNaN(now)) return String(d);
     return String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
   }
 
@@ -1118,23 +1120,29 @@ footer {
     return sec;
   }
 
-  function renderAll() {
+  function renderAll(reviews) {
     const list = $id('reviewsList');
     if (!list) return;
-    // remove only previously-rendered user rows (marked data-user="1")
     list.querySelectorAll('section[data-user="1"]').forEach(s => s.remove());
-    const stored = getStored();          // newest first
-    const staticCount = list.querySelectorAll('section').length;
+    const stored = reviews || getStored();
     stored.forEach((rv, i) => {
       const row = makeRow(rv, i + 1);
       row.setAttribute('data-user', '1');
       list.insertBefore(row, list.firstChild);
     });
-    // renumber static rows so numbering stays continuous
     list.querySelectorAll('section:not([data-user="1"])').forEach((s, i) => {
       const span = s.querySelector('.row-idx');
       if (span) span.textContent = String(i + 1 + stored.length).padStart(2,'0') + ' · Avaliação';
     });
+  }
+
+  function fetchReviews() {
+    // prefer the backend; fall back to local storage when not configured/offline
+    if (!API_URL || API_URL.indexOf('REPLACE') === 0) { renderAll(); return; }
+    fetch(API_URL)
+      .then(r => r.json())
+      .then(d => { if (d && d.ok && Array.isArray(d.reviews)) { renderAll(d.reviews); store(d.reviews); } })
+      .catch(() => renderAll());
   }
 
   function clearReviewForm() {
@@ -1160,19 +1168,37 @@ footer {
     if (!text)     { TK('Por favor escreva um comentário'); return; }
     const stars = parseInt(ratingEl.value);
     const rv = { name, text, stars, date: Date.now() };
-    const list = getStored();
-    list.unshift(rv);            // newest first
-    store(list);
-    renderAll();
-    clearReviewForm();
-    TK('✓ Obrigada, ' + name + '! A sua avaliação foi publicada.');
-    // scroll to top of reviews so the new one is visible
+
+    if (API_URL && API_URL.indexOf('REPLACE') !== 0) {
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ name, text, stars })
+      }).then(r => r.json()).then(d => {
+        if (d && d.ok) {
+          const list = getStored(); list.unshift(rv); store(list);
+          renderAll(); clearReviewForm();
+          TK('✓ Obrigada, ' + name + '! A sua avaliação foi publicada.');
+        } else {
+          TK('Não foi possível publicar. Tente novamente.');
+        }
+      }).catch(() => {
+        // offline fallback: keep local
+        const list = getStored(); list.unshift(rv); store(list);
+        renderAll(); clearReviewForm();
+        TK('✓ Obrigada! Avaliação guardada neste dispositivo.');
+      });
+    } else {
+      // backend not configured yet: keep local
+      const list = getStored(); list.unshift(rv); store(list);
+      renderAll(); clearReviewForm();
+      TK('✓ Obrigada, ' + name + '! A sua avaliação foi publicada.');
+    }
     const top = $id('reviewsList');
     if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // render stored reviews on load (newest at top)
-  renderAll();
+  fetchReviews();
 })();
 </script>
 
