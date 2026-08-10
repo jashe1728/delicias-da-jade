@@ -977,6 +977,7 @@ footer {
   <div class="hero-kicker">Avaliações · Delícias da Jade</div>
   <h1>O que dizem os nossos clientes</h1>
   <p>Bolos artesanais feitos com amor em Almada. Veja algumas opiniões — e deixe a sua!</p>
+  <p class="review-count" id="reviewCount" style="font-size:.8rem;color:var(--rose);font-weight:500;margin-top:.4rem">✨ <span id="reviewCountNum">4</span> clientes satisfeitos</p>
   <a class="hero-cta" href="index.html#sec-tamanho">Encomendar agora</a>
 </section>
   <div class="rows" id="reviewsList">
@@ -987,7 +988,6 @@ footer {
       </svg>
     </div>
   <div class="row-text">
-      <span class="row-idx">01 · Avaliação</span>
       <div class="quote">Jadeeee! Teu bolo foi um sucesso!</div>
       <div class="rev-stars">★★★★★</div>
       <div class="rev-who">Cliente satisfeita · 12 de abril</div>
@@ -995,7 +995,6 @@ footer {
 </section>
 <section class="alt-row">
   <div class="row-text">
-      <span class="row-idx">02 · Avaliação</span>
       <div class="quote">Amei! E está bue bom. Obrigada!</div>
       <div class="rev-stars">★★★★★</div>
       <div class="rev-who">Cliente feliz · maio</div>
@@ -1013,7 +1012,6 @@ footer {
       </svg>
     </div>
   <div class="row-text">
-      <span class="row-idx">03 · Avaliação</span>
       <div class="quote">Boa noite! Esqueci-me de dizer… o bolo estava mutooo bommm. Amei muito! 🥺❤️</div>
       <div class="rev-stars">★★★★★</div>
       <div class="rev-who">Cliente satisfeita · maio</div>
@@ -1021,7 +1019,6 @@ footer {
 </section>
 <section class="alt-row">
   <div class="row-text">
-      <span class="row-idx">04 · Avaliação</span>
       <div class="quote">Olá Jade, bom dia! O bolo estava muito bom e muito bonito, como sempre. Obrigada! ❤️❤️❤️</div>
       <div class="rev-stars">★★★★★</div>
       <div class="rev-who">Cliente feliz · outubro 2025</div>
@@ -1100,13 +1097,12 @@ footer {
     return String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
   }
 
-  function makeRow(rv, idx) {
+  function makeRow(rv) {
     const sec = document.createElement('section');
     sec.className = 'alt-row';
     const stars = '★'.repeat(rv.stars) + '☆'.repeat(5 - rv.stars);
     sec.innerHTML =
       '<div class="row-text">' +
-        '<span class="row-idx">' + String(idx).padStart(2,'0') + ' · Avaliação</span>' +
         '<div class="quote"></div>' +
         '<div class="rev-stars">' + stars + '</div>' +
         '<div class="rev-who">' + (rv.name || 'Anónimo') + ' · ' + fmtDate(rv.date) + '</div>' +
@@ -1120,20 +1116,26 @@ footer {
     return sec;
   }
 
+  function updateCount() {
+    const el = $id('reviewCountNum');
+    if (!el) return;
+    const list = $id('reviewsList');
+    if (!list) return;
+    const total = list.querySelectorAll('section').length;
+    el.textContent = total;
+  }
+
   function renderAll(reviews) {
     const list = $id('reviewsList');
     if (!list) return;
     list.querySelectorAll('section[data-user="1"]').forEach(s => s.remove());
     const stored = reviews || getStored();
-    stored.forEach((rv, i) => {
-      const row = makeRow(rv, i + 1);
+    stored.forEach(rv => {
+      const row = makeRow(rv);
       row.setAttribute('data-user', '1');
       list.insertBefore(row, list.firstChild);
     });
-    list.querySelectorAll('section:not([data-user="1"])').forEach((s, i) => {
-      const span = s.querySelector('.row-idx');
-      if (span) span.textContent = String(i + 1 + stored.length).padStart(2,'0') + ' · Avaliação';
-    });
+    updateCount();
   }
 
   function fetchReviews() {
