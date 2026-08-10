@@ -979,7 +979,7 @@ footer {
   <p>Bolos artesanais feitos com amor em Almada. Veja algumas opiniões — e deixe a sua!</p>
   <a class="hero-cta" href="index.html#sec-tamanho">Encomendar agora</a>
 </section>
-  <div class="rows">
+  <div class="rows" id="reviewsList">
   <section class="alt-row">
   <div class="row-media">
       <svg viewBox="0 0 800 600" width="100%" style="display:block;border-radius:var(--r-lg);background:var(--rose-soft)">
@@ -1054,7 +1054,7 @@ footer {
     </div>
   </div>
   <button class="review-submit" id="rvSubmit" type="button" onclick="submitReview()">Enviar avaliação</button>
-  <p style="font-size:.7rem;color:var(--muted);margin-top:.6rem">A avaliação abre no WhatsApp e chega diretamente à Jade — <a href="#" onclick="event.preventDefault();submitReviewEmail()" style="color:var(--rose);text-decoration:underline">prefere enviar por email?</a></p>
+  <p style="font-size:.7rem;color:var(--muted);margin-top:.6rem">A sua avaliação aparece imediatamente no site, no topo da lista. 🌟</p>
   <div class="review-success" id="rvSuccess"></div>
 </div>
 </main>
@@ -1081,38 +1081,67 @@ footer {
 
 <script>
 (function(){
-  // ── REVIEWS — enviadas diretamente para a Jade (WhatsApp ou email) ──
+  // ── REVIEWS — aparecem diretamente no site (novas no topo) ──
   function $id(i){ return document.getElementById(i); }
-  function buildReviewText() {
-    const name = ($id('rvName')?.value ?? '').trim();
-    const text = ($id('rvText')?.value ?? '').trim();
-    const ratingEl = document.querySelector('input[name="rating"]:checked');
-    const stars = ratingEl ? parseInt(ratingEl.value) : 0;
-    const now = new Date();
-    const d = String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
-    return {
-      name,
-      text:
-        'AVALIAÇÃO — DELÍCIAS DA JADE\n\n'
-        +'Nota: '+'★'.repeat(stars)+'☆'.repeat(5-stars)+' ('+stars+'/5)\n'
-        +'Data: '+d+'\n'
-        +'Nome: '+(name||'Anónimo')+'\n\n'
-        +'Comentário:\n'+(text||'—')+'\n\n'
-        +'— Enviado pelo site'
-    };
+  const LS_KEY = 'dj_reviews';
+
+  function getStored() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+    catch (e) { return []; }
   }
+  function store(list) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  function fmtDate(d) {
+    const now = new Date(d);
+    return String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+  }
+
+  function makeRow(rv, idx) {
+    const sec = document.createElement('section');
+    sec.className = 'alt-row';
+    const stars = '★'.repeat(rv.stars) + '☆'.repeat(5 - rv.stars);
+    sec.innerHTML =
+      '<div class="row-text">' +
+        '<span class="row-idx">' + String(idx).padStart(2,'0') + ' · Avaliação</span>' +
+        '<div class="quote"></div>' +
+        '<div class="rev-stars">' + stars + '</div>' +
+        '<div class="rev-who">' + (rv.name || 'Anónimo') + ' · ' + fmtDate(rv.date) + '</div>' +
+      '</div>' +
+      '<div class="row-media">' +
+        '<svg viewBox="0 0 800 600" width="100%" style="display:block;border-radius:var(--r-lg);background:var(--rose-soft)">' +
+          '<text x="400" y="330" font-family="Georgia,serif" font-style="italic" font-size="190" fill="#C8566A" text-anchor="middle">”</text>' +
+        '</svg>' +
+      '</div>';
+    sec.querySelector('.quote').textContent = rv.text;
+    return sec;
+  }
+
+  function renderAll() {
+    const list = $id('reviewsList');
+    if (!list) return;
+    // remove only previously-rendered user rows (marked data-user="1")
+    list.querySelectorAll('section[data-user="1"]').forEach(s => s.remove());
+    const stored = getStored();          // newest first
+    const staticCount = list.querySelectorAll('section').length;
+    stored.forEach((rv, i) => {
+      const row = makeRow(rv, i + 1);
+      row.setAttribute('data-user', '1');
+      list.insertBefore(row, list.firstChild);
+    });
+    // renumber static rows so numbering stays continuous
+    list.querySelectorAll('section:not([data-user="1"])').forEach((s, i) => {
+      const span = s.querySelector('.row-idx');
+      if (span) span.textContent = String(i + 1 + stored.length).padStart(2,'0') + ' · Avaliação';
+    });
+  }
+
   function clearReviewForm() {
     const rvName = $id('rvName'), rvText = $id('rvText');
     if (rvName) rvName.value = '';
     if (rvText) rvText.value = '';
     document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
-  }
-  function showReviewSuccess(name, canal) {
-    const success = $id('rvSuccess');
-    if (!success) return;
-    success.textContent = '✓ Obrigada, ' + name + '! A sua avaliação está pronta no ' + canal + ' — basta enviar para a Jade receber.';
-    success.classList.add('show');
-    setTimeout(() => success.classList.remove('show'), 5000);
   }
   function TK(msg) {
     const t = $id('tk') || $id('toast');
@@ -1121,11 +1150,7 @@ footer {
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
   }
-  function sendViaWhatsApp(text) {
-    const url = 'https://wa.me/351928331954?text=' + encodeURIComponent(text);
-    window.open(url, '_blank');
-    return Promise.resolve();
-  }
+
   window.submitReview = function() {
     const name = ($id('rvName')?.value ?? '').trim();
     const text = ($id('rvText')?.value ?? '').trim();
@@ -1133,22 +1158,21 @@ footer {
     if (!name)     { TK('Por favor insira o seu nome'); return; }
     if (!ratingEl) { TK('Por favor selecione uma classificação'); return; }
     if (!text)     { TK('Por favor escreva um comentário'); return; }
-    const order = buildReviewText();
-    sendViaWhatsApp(order.text).then(() => { showReviewSuccess(order.name, 'WhatsApp'); clearReviewForm(); });
-  };
-  window.submitReviewEmail = function() {
-    const name = ($id('rvName')?.value ?? '').trim();
-    const text = ($id('rvText')?.value ?? '').trim();
-    const ratingEl = document.querySelector('input[name="rating"]:checked');
-    if (!name)     { TK('Por favor insira o seu nome'); return; }
-    if (!ratingEl) { TK('Por favor selecione uma classificação'); return; }
-    if (!text)     { TK('Por favor escreva um comentário'); return; }
-    const order = buildReviewText();
-    const subj = encodeURIComponent('Avaliação — Delícias da Jade — ' + order.name);
-    window.location.href = 'mailto:deliciasdajade@gmail.com?subject=' + subj + '&body=' + encodeURIComponent(order.text);
-    showReviewSuccess(order.name, 'email');
+    const stars = parseInt(ratingEl.value);
+    const rv = { name, text, stars, date: Date.now() };
+    const list = getStored();
+    list.unshift(rv);            // newest first
+    store(list);
+    renderAll();
     clearReviewForm();
+    TK('✓ Obrigada, ' + name + '! A sua avaliação foi publicada.');
+    // scroll to top of reviews so the new one is visible
+    const top = $id('reviewsList');
+    if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  // render stored reviews on load (newest at top)
+  renderAll();
 })();
 </script>
 
